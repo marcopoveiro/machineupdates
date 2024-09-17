@@ -2,15 +2,9 @@ version: "v1.0"
 name: Update Servers
 
 blocks:
-  - name: Update and Deploy
-    task:
-      jobs:
-        - name: Update Server
-          commands:
-            - echo "Updating server..."
-            - ssh $SSH_USER@$SSH_HOST << 'EOF'
-              cd /path/to/your/app  # Change to your project directory
-              git pull origin main  # Pull the latest code
-              # Add any additional deployment commands here
-              # e.g., restart services, clear caches, etc.
-              EOF
+ - name: Update and upgrade apt packages
+  become: true
+  apt:
+    upgrade: yes
+    update_cache: yes
+    cache_valid_time: 86400 #One day
