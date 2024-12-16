@@ -13,6 +13,11 @@ blocks:
         apt:
           update_cache: yes
           cache_valid_time: 86400  # Cache valid for one day
+        register: cache_result  # Register the result of this task
+
+      - name: Show APT Cache Result
+        debug:
+          var: cache_result
 
       - name: Upgrade All Packages
         apt:
@@ -31,7 +36,3 @@ blocks:
       - name: Display Completion Message
         debug:
           msg: "APT update and upgrade process completed successfully!"
-
-      - name: Show APT Cache Result
-        debug:
-          var: cache_result
