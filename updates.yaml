@@ -31,3 +31,7 @@ blocks:
       - name: Display Completion Message
         debug:
           msg: "APT update and upgrade process completed successfully!"
+
+      - name: Show APT Cache Result
+        debug:
+          var: cache_result
