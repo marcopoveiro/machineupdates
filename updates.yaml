@@ -1,0 +1,33 @@
+version: "v1.0"
+name: Update Servers
+
+blocks:
+  - name: Update and Upgrade APT Packages
+    become: true  # Ensures root privileges
+    tasks:
+      - name: Display Start Message
+        debug:
+          msg: "Starting APT update and upgrade process on the servers."
+
+      - name: Update APT Cache
+        apt:
+          update_cache: yes
+          cache_valid_time: 86400  # Cache valid for one day
+
+      - name: Upgrade All Packages
+        apt:
+          upgrade: dist  # Ensures distribution upgrades
+        register: upgrade_result
+
+      - name: Display Upgrade Results
+        debug:
+          msg: "Packages upgraded successfully. Details:\n{{ upgrade_result.stdout }}"
+
+      - name: Cleanup Unused Packages
+        apt:
+          autoremove: yes
+          autoclean: yes
+
+      - name: Display Completion Message
+        debug:
+          msg: "APT update and upgrade process completed successfully!"
