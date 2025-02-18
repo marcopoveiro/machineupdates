@@ -1,40 +1,27 @@
 - name: Update and Upgrade APT Packages
   hosts: servers
-  become: yes  # Ensure sudo privileges
+  become: yes
 
   tasks:
     - name: ✅ Connected to {{ inventory_hostname }}
       debug:
-        msg: "Successfully connected to {{ inventory_hostname }}"
+        msg: "Successfully connected to {{ inventory_hostname }} - Updating system now..."
 
-    - name: Display Start Message
-      debug:
-        msg: "Starting APT update and upgrade process on the servers."
-
-    - name: Update APT Cache
+    - name: 🔄 Updating APT Cache on {{ inventory_hostname }}
       apt:
         update_cache: yes
-        cache_valid_time: 86400  # Cache valid for one day
-      register: cache_result  # Register the result of this task
+      when: ansible_os_family == "Debian"
 
-    - name: Show APT Cache Result
-      debug:
-        var: cache_result
-
-    - name: Upgrade All Packages
+    - name: 🚀 Upgrading all packages on {{ inventory_hostname }}
       apt:
-        upgrade: dist  # Ensures distribution upgrades
-      register: upgrade_result
+        upgrade: full
+      when: ansible_os_family == "Debian"
 
-    - name: Display Upgrade Results
-      debug:
-        msg: "Packages upgraded successfully. Details:\n{{ upgrade_result.stdout }}"
-
-    - name: Cleanup Unused Packages
+    - name: 🧹 Cleaning up unused packages on {{ inventory_hostname }}
       apt:
         autoremove: yes
         autoclean: yes
 
-    - name: Display Completion Message
+    - name: ✅ Update complete on {{ inventory_hostname }}
       debug:
-        msg: "APT update and upgrade process completed successfully!"
+        msg: "Update process completed on {{ inventory_hostname }}"
