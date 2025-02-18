@@ -1,6 +1,11 @@
-- name: Update and Upgrade APT Packages
+- name: Verify connection to remote machines
   hosts: servers
   become: yes
+  tasks:
+    - name: ✅ Connected to {{ inventory_hostname }}
+      debug:
+        msg: "Successfully connected to {{ inventory_hostname }} - Ready for updates!"
+
 
   tasks:
     - name: ✅ Connected to {{ inventory_hostname }}
