@@ -3,29 +3,10 @@
   become: yes  # Ensure sudo privileges
 
   tasks:
-    - name: ✅ Connected to {{ inventory_hostname }} 
+    - name: ✅ Connected to {{ inventory_hostname }}
       debug:
         msg: "Successfully connected to {{ inventory_hostname }}"
 
-    - name: Update APT Cache
-      apt:
-        update_cache: yes
-      when: ansible_os_family == "Debian"
-
-    - name: Upgrade all packages
-      apt:
-        upgrade: full
-      when: ansible_os_family == "Debian"
-
-    - name: Cleanup Unused Packages
-      apt:
-        autoremove: yes
-        autoclean: yes
-
-- name: Update and Upgrade APT Packages
-  hosts: servers
-  become: yes  # Ensures root privileges
-  tasks:
     - name: Display Start Message
       debug:
         msg: "Starting APT update and upgrade process on the servers."
@@ -57,4 +38,3 @@
     - name: Display Completion Message
       debug:
         msg: "APT update and upgrade process completed successfully!"
-
