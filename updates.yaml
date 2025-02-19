@@ -1,5 +1,5 @@
 - name: Verify connection to remote machines
-  hosts: servers
+  hosts: all
   become: yes
   tasks:
     - name: ✅ Connected to {{ inventory_hostname }}
