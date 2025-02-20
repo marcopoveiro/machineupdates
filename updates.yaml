@@ -28,6 +28,13 @@
       changed_when: dpkg_status.rc == 0
       when: ansible_os_family == "Debian"
 
+    - name: 🛠️ Fix unmet dependencies with `apt --fix-broken install`
+      command: apt --fix-broken install -y
+      register: apt_fix
+      failed_when: apt_fix.rc not in [0, 1]
+      changed_when: apt_fix.rc == 0
+      when: ansible_os_family == "Debian"
+
     - name: 🚨 Identify and remove broken repositories
       shell: |
         grep -lr "mirror.layeronline.com" /etc/apt/sources.list* | xargs rm -f
@@ -62,7 +69,13 @@
     - name: 🚀 Upgrading all packages on {{ inventory_hostname }}
       apt:
         upgrade: full
+      register: apt_upgrade
+      ignore_errors: yes
       when: ansible_os_family == "Debian"
+
+    - name: 🛠️ Retry upgrade if unmet dependencies were detected
+      command: apt --fix-broken install -y
+      when: apt_upgrade is failed and ansible_os_family == "Debian"
 
     - name: 🧹 Cleaning up unused packages on {{ inventory_hostname }}
       apt:
