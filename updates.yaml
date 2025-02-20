@@ -6,7 +6,9 @@
       debug:
         msg: "Successfully connected to {{ inventory_hostname }} - Ready for updates!"
 
-
+- name: System Update on all machines
+  hosts: all
+  become: yes
   tasks:
     - name: ✅ Connected to {{ inventory_hostname }}
       debug:
@@ -15,6 +17,13 @@
     - name: 🔄 Updating APT Cache on {{ inventory_hostname }}
       apt:
         update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: 🛠️ Check for any broken packages before upgrading
+      command: dpkg --configure -a
+      register: dpkg_status
+      failed_when: dpkg_status.rc not in [0, 1]
+      changed_when: dpkg_status.rc == 0
       when: ansible_os_family == "Debian"
 
     - name: 🚀 Upgrading all packages on {{ inventory_hostname }}
@@ -26,6 +35,7 @@
       apt:
         autoremove: yes
         autoclean: yes
+      when: ansible_os_family == "Debian"
 
     - name: ✅ Update complete on {{ inventory_hostname }}
       debug:
