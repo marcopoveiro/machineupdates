@@ -17,13 +17,46 @@
     - name: 🔄 Updating APT Cache on {{ inventory_hostname }}
       apt:
         update_cache: yes
+      register: apt_update
+      ignore_errors: yes
       when: ansible_os_family == "Debian"
 
-    - name: 🛠️ Check for any broken packages before upgrading
+    - name: 🛠️ Fix broken dpkg installations before upgrading
       command: dpkg --configure -a
       register: dpkg_status
       failed_when: dpkg_status.rc not in [0, 1]
       changed_when: dpkg_status.rc == 0
+      when: ansible_os_family == "Debian"
+
+    - name: 🚨 Identify and remove broken repositories
+      shell: |
+        grep -lr "mirror.layeronline.com" /etc/apt/sources.list* | xargs rm -f
+      args:
+        warn: false
+      changed_when: false
+      when: ansible_os_family == "Debian"
+
+    - name: 🔍 Ensure MariaDB repository is correct
+      shell: |
+        echo "deb [signed-by=/usr/share/keyrings/mariadb-keyring.gpg] https://mirror.mariadb.org/repo/10.11/ubuntu jammy main" > /etc/apt/sources.list.d/mariadb.list
+      args:
+        warn: false
+      changed_when: true
+      when: ansible_os_family == "Debian"
+
+    - name: 🗝️ Fix deprecated GPG key storage
+      shell: |
+        mkdir -p /usr/share/keyrings
+        rm -f /etc/apt/trusted.gpg.d/mariadb.gpg
+        curl -fsSL https://mariadb.org/mariadb_release_signing_key.asc | gpg --dearmor -o /usr/share/keyrings/mariadb-keyring.gpg
+      args:
+        warn: false
+      changed_when: true
+      when: ansible_os_family == "Debian"
+
+    - name: 🔄 Re-update APT Cache after repository fixes
+      apt:
+        update_cache: yes
       when: ansible_os_family == "Debian"
 
     - name: 🚀 Upgrading all packages on {{ inventory_hostname }}
