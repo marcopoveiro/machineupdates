@@ -1,11 +1,13 @@
 ---
-- name: Check pending APT updates (no install)
+- name: Check pending updates on Debian/Ubuntu/Proxmox (APT)
   hosts: linux:proxmox
   become: true
   gather_facts: true
+  ignore_unreachable: true
+  any_errors_fatal: false
 
   tasks:
-    - name: Only run on Debian family
+    - name: Skip non-Debian family
       ansible.builtin.meta: end_host
       when: ansible_facts.os_family != "Debian"
 
@@ -13,6 +15,8 @@
       ansible.builtin.apt:
         update_cache: yes
         cache_valid_time: 3600
+      register: apt_cache
+      failed_when: false
 
     - name: List upgradable packages
       ansible.builtin.command: apt list --upgradable
@@ -20,16 +24,52 @@
       changed_when: false
       failed_when: false
 
-    - name: Compute counts
+    - name: Compute APT counts
       ansible.builtin.set_fact:
-        upgradable_count: "{{ (upgradable.stdout_lines | length - 1) if (upgradable.stdout_lines | length > 1) else 0 }}"
-        updates_available: "{{ (upgradable.stdout_lines | length) > 1 }}"
+        updates_tool: "apt"
+        updates_available: "{{ (upgradable.stdout_lines | default([]) | length) > 1 }}"
+        upgradable_count: "{{ ((upgradable.stdout_lines | default([]) | length) - 1) if ((upgradable.stdout_lines | default([]) | length) > 1) else 0 }}"
 
-    - name: Summary per host
+    - name: Summary per host (APT)
       ansible.builtin.debug:
-        msg: "updates_available={{ updates_available }} upgradable_count={{ upgradable_count }}"
+        msg: "tool={{ updates_tool }} updates_available={{ updates_available }} upgradable_count={{ upgradable_count }}"
 
     - name: Show packages (only if any)
       ansible.builtin.debug:
         var: upgradable.stdout_lines
-      when: updates_available
+      when: updates_available | bool
+
+
+- name: Check pending updates on OpenWRT (OPKG)
+  hosts: routers
+  gather_facts: false
+  ignore_unreachable: true
+  any_errors_fatal: false
+
+  tasks:
+    - name: OPKG update (refresh lists)
+      ansible.builtin.raw: opkg update
+      register: opkg_update
+      changed_when: false
+      failed_when: false
+
+    - name: List upgradable packages (opkg list-upgradable)
+      ansible.builtin.raw: opkg list-upgradable
+      register: opkg_up
+      changed_when: false
+      failed_when: false
+
+    - name: Compute OPKG counts
+      ansible.builtin.set_fact:
+        updates_tool: "opkg"
+        updates_available: "{{ (opkg_up.stdout_lines | default([]) | length) > 0 }}"
+        upgradable_count: "{{ (opkg_up.stdout_lines | default([]) | length) }}"
+
+    - name: Summary per host (OPKG)
+      ansible.builtin.debug:
+        msg: "tool={{ updates_tool }} updates_available={{ updates_available }} upgradable_count={{ upgradable_count }}"
+
+    - name: Show packages (only if any)
+      ansible.builtin.debug:
+        var: opkg_up.stdout_lines
+      when: updates_available | bool
