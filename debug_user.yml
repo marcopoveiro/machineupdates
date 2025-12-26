@@ -1,0 +1,25 @@
+---
+- name: Debug SSH user & sudo
+  hosts: all
+  gather_facts: false
+  ignore_unreachable: true
+  any_errors_fatal: false
+
+  tasks:
+    - name: Who am I on the remote host?
+      ansible.builtin.raw: "echo HOST={{ inventory_hostname }} REMOTE_USER=$(whoami)"
+      register: who
+      changed_when: false
+      failed_when: false
+
+    - ansible.builtin.debug:
+        var: who.stdout
+
+    - name: Test sudo -n (must be root if NOPASSWD works)
+      ansible.builtin.raw: "sudo -n whoami || echo SUDO_N_FAIL"
+      register: sudotest
+      changed_when: false
+      failed_when: false
+
+    - ansible.builtin.debug:
+        msg: "HOST={{ inventory_hostname }} sudo_test={{ sudotest.stdout | default('') | trim }}"
