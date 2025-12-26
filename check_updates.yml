@@ -91,3 +91,10 @@
       ansible.builtin.debug:
         msg: "tool=unknown (no apt/opkg found) - skipping"
       when: pkg_mgr == "UNKNOWN"
+
+    - name: Detect package manager (apt/opkg)
+      ansible.builtin.raw: |
+      (command -v apt >/dev/null 2>&1 && echo PKG_MGR=APT) || \
+      (command -v opkg >/dev/null 2>&1 && echo PKG_MGR=OPKG) || \
+      echo PKG_MGR=UNKNOWN
+
