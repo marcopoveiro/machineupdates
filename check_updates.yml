@@ -1,75 +1,93 @@
 ---
-- name: Check pending updates on Debian/Ubuntu/Proxmox (APT)
-  hosts: linux:proxmox
-  become: true
-  gather_facts: true
-  ignore_unreachable: true
-  any_errors_fatal: false
-
-  tasks:
-    - name: Skip non-Debian family
-      ansible.builtin.meta: end_host
-      when: ansible_facts.os_family != "Debian"
-
-    - name: Update APT cache (apt update)
-      ansible.builtin.apt:
-        update_cache: yes
-        cache_valid_time: 3600
-      register: apt_cache
-      failed_when: false
-
-    - name: List upgradable packages
-      ansible.builtin.command: apt list --upgradable
-      register: upgradable
-      changed_when: false
-      failed_when: false
-
-    - name: Compute APT counts
-      ansible.builtin.set_fact:
-        updates_tool: "apt"
-        updates_available: "{{ (upgradable.stdout_lines | default([]) | length) > 1 }}"
-        upgradable_count: "{{ ((upgradable.stdout_lines | default([]) | length) - 1) if ((upgradable.stdout_lines | default([]) | length) > 1) else 0 }}"
-
-    - name: Summary per host (APT)
-      ansible.builtin.debug:
-        msg: "tool={{ updates_tool }} updates_available={{ updates_available }} upgradable_count={{ upgradable_count }}"
-
-    - name: Show packages (only if any)
-      ansible.builtin.debug:
-        var: upgradable.stdout_lines
-      when: updates_available | bool
-
-
-- name: Check pending updates on OpenWRT (OPKG)
-  hosts: routers
+- name: Check pending updates (APT + OPKG) - tolerant / report-only
+  hosts: linux:proxmox:routers
   gather_facts: false
   ignore_unreachable: true
   any_errors_fatal: false
 
   tasks:
-    - name: OPKG update (refresh lists)
+    # --- Detect package manager without facts ---
+    - name: Detect package manager (apt/opkg)
+      ansible.builtin.raw: |
+        if command -v apt >/dev/null 2>&1; then echo PKG_MGR=APT;
+        elif command -v opkg >/dev/null 2>&1; then echo PKG_MGR=OPKG;
+        else echo PKG_MGR=UNKNOWN; fi
+      register: pkgmgr
+      changed_when: false
+      failed_when: false
+
+    - name: Set pkg manager fact
+      ansible.builtin.set_fact:
+        pkg_mgr: "{{ (pkgmgr.stdout | default('PKG_MGR=UNKNOWN')) | trim | regex_replace('^PKG_MGR=', '') }}"
+
+    # --- APT path (Debian/Ubuntu/Proxmox) ---
+    - name: APT - update cache (no install)
+      become: true
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: pkg_mgr == "APT"
+      failed_when: false
+
+    - name: APT - list upgradable packages
+      become: true
+      ansible.builtin.command: apt list --upgradable
+      register: apt_up
+      changed_when: false
+      failed_when: false
+      when: pkg_mgr == "APT"
+
+    - name: APT - compute counts
+      ansible.builtin.set_fact:
+        updates_tool: "apt"
+        updates_available: "{{ (apt_up.stdout_lines | default([]) | length) > 1 }}"
+        upgradable_count: "{{ ((apt_up.stdout_lines | default([]) | length) - 1) if ((apt_up.stdout_lines | default([]) | length) > 1) else 0 }}"
+      when: pkg_mgr == "APT"
+
+    - name: APT - summary
+      ansible.builtin.debug:
+        msg: "tool=apt updates_available={{ updates_available | default(false) }} upgradable_count={{ upgradable_count | default(0) }}"
+      when: pkg_mgr == "APT"
+
+    - name: APT - show packages (only if any)
+      ansible.builtin.debug:
+        var: apt_up.stdout_lines
+      when: pkg_mgr == "APT" and (updates_available | default(false) | bool)
+
+    # --- OPKG path (OpenWRT) ---
+    - name: OPKG - update lists
       ansible.builtin.raw: opkg update
       register: opkg_update
       changed_when: false
       failed_when: false
+      when: pkg_mgr == "OPKG"
 
-    - name: List upgradable packages (opkg list-upgradable)
+    - name: OPKG - list upgradable packages
       ansible.builtin.raw: opkg list-upgradable
       register: opkg_up
       changed_when: false
       failed_when: false
+      when: pkg_mgr == "OPKG"
 
-    - name: Compute OPKG counts
+    - name: OPKG - compute counts
       ansible.builtin.set_fact:
         updates_tool: "opkg"
         updates_available: "{{ (opkg_up.stdout_lines | default([]) | length) > 0 }}"
         upgradable_count: "{{ (opkg_up.stdout_lines | default([]) | length) }}"
+      when: pkg_mgr == "OPKG"
 
-    - name: Summary per host (OPKG)
+    - name: OPKG - summary
       ansible.builtin.debug:
-        msg: "tool={{ updates_tool }} updates_available={{ updates_available }} upgradable_count={{ upgradable_count }}"
+        msg: "tool=opkg updates_available={{ updates_available | default(false) }} upgradable_count={{ upgradable_count | default(0) }}"
+      when: pkg_mgr == "OPKG"
 
-    - name: Show packages (only if any)
+    - name: OPKG - show packages (only if any)
       ansible.builtin.debug:
         var: opkg_up.stdout_lines
-      when: updates_available | bool
+      when: pkg_mgr == "OPKG" and (updates_available | default(false) | bool)
+
+    # --- Unknown path ---
+    - name: Unknown package manager - summary
+      ansible.builtin.debug:
+        msg: "tool=unknown (no apt/opkg found) - skipping"
+      when: pkg_mgr == "UNKNOWN"
