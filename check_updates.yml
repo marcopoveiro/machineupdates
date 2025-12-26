@@ -1,0 +1,35 @@
+---
+- name: Check pending APT updates (no install)
+  hosts: linux:proxmox
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Only run on Debian family
+      ansible.builtin.meta: end_host
+      when: ansible_facts.os_family != "Debian"
+
+    - name: Update APT cache (apt update)
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: List upgradable packages
+      ansible.builtin.command: apt list --upgradable
+      register: upgradable
+      changed_when: false
+      failed_when: false
+
+    - name: Compute counts
+      ansible.builtin.set_fact:
+        upgradable_count: "{{ (upgradable.stdout_lines | length - 1) if (upgradable.stdout_lines | length > 1) else 0 }}"
+        updates_available: "{{ (upgradable.stdout_lines | length) > 1 }}"
+
+    - name: Summary per host
+      ansible.builtin.debug:
+        msg: "updates_available={{ updates_available }} upgradable_count={{ upgradable_count }}"
+
+    - name: Show packages (only if any)
+      ansible.builtin.debug:
+        var: upgradable.stdout_lines
+      when: updates_available
