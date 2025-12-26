@@ -6,12 +6,12 @@
   any_errors_fatal: false
 
   tasks:
-    # --- Detect package manager without facts ---
+    # --- Detect package manager without facts (robust) ---
     - name: Detect package manager (apt/opkg)
       ansible.builtin.raw: |
-        if command -v apt >/dev/null 2>&1; then echo PKG_MGR=APT;
-        elif command -v opkg >/dev/null 2>&1; then echo PKG_MGR=OPKG;
-        else echo PKG_MGR=UNKNOWN; fi
+        (command -v apt >/dev/null 2>&1 && echo PKG_MGR=APT) || \
+        (command -v opkg >/dev/null 2>&1 && echo PKG_MGR=OPKG) || \
+        echo PKG_MGR=UNKNOWN
       register: pkgmgr
       changed_when: false
       failed_when: false
@@ -27,6 +27,7 @@
         update_cache: yes
         cache_valid_time: 3600
       when: pkg_mgr == "APT"
+      register: apt_cache
       failed_when: false
 
     - name: APT - list upgradable packages
@@ -91,10 +92,3 @@
       ansible.builtin.debug:
         msg: "tool=unknown (no apt/opkg found) - skipping"
       when: pkg_mgr == "UNKNOWN"
-
-    - name: Detect package manager (apt/opkg)
-      ansible.builtin.raw: |
-      (command -v apt >/dev/null 2>&1 && echo PKG_MGR=APT) || \
-      (command -v opkg >/dev/null 2>&1 && echo PKG_MGR=OPKG) || \
-      echo PKG_MGR=UNKNOWN
-
